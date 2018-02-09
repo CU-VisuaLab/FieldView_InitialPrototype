@@ -20,7 +20,6 @@ public class CSVReader : MonoBehaviour {
 
     void Start()
     {
-    
     }
 
     public void ParseData()
@@ -110,6 +109,30 @@ public class CSVReader : MonoBehaviour {
             if (Convert.ToDouble(rowData[i][2]) > maxValue)
             {
                 maxValue = Convert.ToDouble(rowData[i][2]);
+            }
+        }
+        return maxValue;
+    }
+    public double MinZValue()
+    {
+        double minValue = double.MaxValue;
+        for (int i = 1; i < rowData.Count; i++)
+        {
+            if (Convert.ToDouble(rowData[i][3]) < minValue)
+            {
+                minValue = Convert.ToDouble(rowData[i][3]);
+            }
+        }
+        return minValue;
+    }
+    public double MaxZValue()
+    {
+        double maxValue = double.MinValue;
+        for (int i = 1; i < rowData.Count; i++)
+        {
+            if (Convert.ToDouble(rowData[i][3]) > maxValue)
+            {
+                maxValue = Convert.ToDouble(rowData[i][3]);
             }
         }
         return maxValue;

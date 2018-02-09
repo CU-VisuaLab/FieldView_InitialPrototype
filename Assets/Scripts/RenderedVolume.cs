@@ -16,7 +16,7 @@ public class RenderedVolume : MonoBehaviour {
     private GameObject XAxis, YAxis;
 
 	void Start () {
-
+        
         XAxis = GameObject.Find("XAxis");
         YAxis = GameObject.Find("YAxis");
 

@@ -286,8 +286,8 @@ public class OVRInspector : MonoBehaviour
         if (instance != null)
         {
             Debug.LogError("Existing OVRInspector");
-            GameObject.Destroy(gameObject);
             return;
+            //GameObject.Destroy(gameObject);
         }
         instance = this;
 
@@ -299,9 +299,10 @@ public class OVRInspector : MonoBehaviour
         folderPrefab = (Button)Resources.Load("Prefabs/Folder", typeof(Button));
         eventSystemPrefab = (EventSystem)Resources.Load("Prefabs/EventSystem", typeof(EventSystem));
 
-        
-
         // Setup canvas and canvas panel builders 
+
+        //GameObject visCanvasPrefab = (GameObject)Resources.Load("Prefabs/VisCanvas", typeof(GameObject));
+        //Instantiate(visCanvasPrefab).name = "VisCanvas";
         canvas = transform.Find("VisCanvas").gameObject;
 
         leftPanel = new OVRInspectorPanelBuilder(canvas.transform.Find("LeftPanel").gameObject);
@@ -491,6 +492,7 @@ public class OVRInspector : MonoBehaviour
         }
         Hide();
     }
+    
 
     /// <summary>
     /// Reposition the inspector GUI relative to the player
@@ -633,7 +635,6 @@ public class OVRInspector : MonoBehaviour
     /// </summary>
     public void Hide(bool allowWarning = false)
     {
-        Debug.Log("HIDING");
         menuActive = false;
         leftPanel.SetActive(false);
         rightPanel.SetActive(false);
