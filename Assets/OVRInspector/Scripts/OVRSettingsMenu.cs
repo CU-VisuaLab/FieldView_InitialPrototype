@@ -78,7 +78,7 @@ public class OVRSettingsMenu : MonoBehaviour {
             }
         }
 
-		virtualTextureSlider.value = UnityEngine.XR.XRSettings.eyeTextureResolutionScale;
+		//virtualTextureSlider.value = UnityEngine.VR.VRSettings.eyeTextureResolutionScale;
 
 	}
 
@@ -106,7 +106,7 @@ public class OVRSettingsMenu : MonoBehaviour {
         //There's a bug in the integration that means the virtual texture size will be reset now.
         //so we reset it in our UI too so the UI is consistent.
         chosenVirtualTextureSize = 1;
-        UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 1;
+        //UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 1;
         virtualTextureSlider.value = 1;
 
         // This bug also means that tracking is lost so we recenter it now as well
@@ -116,7 +116,7 @@ public class OVRSettingsMenu : MonoBehaviour {
     IEnumerator RecenterFix()
     {
         yield return new WaitForSeconds(1f);
-        UnityEngine.XR.InputTracking.Recenter();
+        //UnityEngine.XR.InputTracking.Recenter();
     }
    
     public void SetVirtualTextureSize(float value)
@@ -127,7 +127,7 @@ public class OVRSettingsMenu : MonoBehaviour {
 
     public void ApplyVirtualTextureSize()
     {
-        UnityEngine.XR.XRSettings.eyeTextureResolutionScale = chosenVirtualTextureSize;
+        //UnityEngine.VR.VRSettings.eyeTextureResolutionScale = chosenVirtualTextureSize;
     }
 
 

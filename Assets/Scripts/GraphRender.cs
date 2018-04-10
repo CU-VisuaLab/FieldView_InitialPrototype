@@ -14,6 +14,7 @@ using System.Collections;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.IO;
+using Newtonsoft.Json;
 
 public class GraphRender : MonoBehaviour {
 
@@ -30,11 +31,15 @@ public class GraphRender : MonoBehaviour {
     private float[] xRange;
     private float[] yRange;
     public float yx_ratio;
+    public bool online;
     private string[] mountainInfo;
     private GameObject[] dataPoints;
+    private List<Mountain> remoteMountains = new List<Mountain>();
+    private List<Mountain> localMountains = new List<Mountain>();
 
     // Use this for initialization
     void Start () {
+        //remoteMountains = new List<Mountain>();
         CSV.ParseData();
         CSV.SetDataSets();
 
@@ -62,15 +67,43 @@ public class GraphRender : MonoBehaviour {
         LoadData();
         ScaleGraph(size_scale);
         SetTickMarks(size_scale);
+
+        /*
+         * Assuming this application was loaded from FieldView, there will be local data passed in
+         */
+        
+       AndroidJavaClass UPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+       AndroidJavaObject currentActivity = UPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+       AndroidJavaObject intent = currentActivity.Call<AndroidJavaObject>("getIntent");
+       bool hasLocal = intent.Call<bool>("hasExtra", "localData");
+        String localData = "No local data synced! Add datapoints in the 'FieldView' app";
+       if (hasLocal)
+       {
+           AndroidJavaObject extras = intent.Call<AndroidJavaObject>("getExtras");
+           localData = extras.Call<string>("getString", "localData");
+            
+            loadLocalData(localData);
+       }
+
+       /*
+        * Get the remote data
+        */
+        /*bool hasRemote = intent.Call<bool>("hasExtra", "address");
+        String remoteAddress = "No remote address!";
+        if (hasRemote)
+        {
+            AndroidJavaObject extras = intent.Call<AndroidJavaObject>("getExtras");
+            remoteAddress = extras.Call<string>("getString", "address");
+        }*/
+        ServerData sd = GameObject.Find("MapScatterRender").GetComponent<ServerData>();
+        if (sd != null) remoteMountains = sd.getMySQLData("studies.cu-visualab.org", "fieldview", "Fourteeners", "visualab", "database1");
         DisplayData();
     }
 
     // Update is called once per frame
     void Update () {
-
         var rayTransform = OVRGazePointer.instance.rayTransform;
         RaycastHit hit;
-
         if (Input.GetMouseButtonDown(0)) // Tap on the Gear VR touchpad
         {
             Ray ray = new Ray(rayTransform.position, rayTransform.forward); // Get the ray from the OVRGazePointer and detect the object hovered
@@ -78,12 +111,42 @@ public class GraphRender : MonoBehaviour {
             {
                 if (hit.transform.GetComponent<SphereCollider>() != null) // If it is a data point
                 {
-                    GameObject.Find("MountainInfo").GetComponent<Text>().text = mountainInfo[getDataPointIndex(hit.transform.gameObject)];// hit.transform.Find("label").GetComponent<TextMesh>().text;
+                    GameObject.Find("MountainInfo").GetComponent<Text>().text = mountainInfo[getDataPointIndex(hit.transform.gameObject)];
+                }
+                else if (hit.transform.gameObject.name == "ZoomInPanel")
+                {
+                    transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z - 0.1f);
+                }
+                else if (hit.transform.gameObject.name == "ZoomOutPanel")
+                {
+                    transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z + 0.1f);
                 }
             }
         }
-        //Debug.Log(GameObject.Find("label").GetComponent<TextMesh>());
-        //GameObject.Find("MountainInfo").GetComponent<Text>().text = GameObject.Find("label").GetComponent<TextMesh>().text;
+        else
+        {
+            if (Math.Abs(Input.GetAxis("Mouse X")) < 1f && Math.Abs(Input.GetAxis("Mouse X")) > 0.3f)
+                transform.position = new Vector3(transform.position.x - (0.2f * Input.GetAxis("Mouse X")), transform.position.y, transform.position.z);
+            if (Math.Abs(Input.GetAxis("Mouse Y")) < 1f && Math.Abs(Input.GetAxis("Mouse Y")) > 0.3f)
+                transform.position = new Vector3(transform.position.x, transform.position.y + (0.2f * Input.GetAxis("Mouse Y")), transform.position.z);
+        }
+    }
+    
+    public void loadLocalData(String objString)
+    {
+        try
+        {
+            localMountains = JsonConvert.DeserializeObject<List<Mountain>>(objString);
+        } catch (Exception e)
+        {
+            GameObject.Find("MountainInfo").GetComponent<Text>().text = "There was an error parsing:  " + objString + e.Message;
+            localMountains = new List<Mountain>();
+        }
+    }
+
+    public void loadRemoteData(List<Mountain> mountains)
+    {
+        remoteMountains = mountains;
     }
 
     void LoadData()
@@ -193,40 +256,62 @@ public class GraphRender : MonoBehaviour {
     
     void DisplayData()
     {
-        mountainInfo = new string[CSV.NumberOfData()];
-        dataPoints = new GameObject[CSV.NumberOfData()];
-        for (int i = 1; i <= CSV.NumberOfData(); i++)
+        int localOffset = 0; // To make sure local points are properly assigned
+        // Offline Mode
+        if (remoteMountains.Count == 0)
         {
-
-            Vector3 position = new Vector3(xRange[0] + (xRange[1] - xRange[0]) * ((Convert.ToSingle(CSV.rowData[i][1]) - xDomain[0]) / (xDomain[1] - xDomain[0])),
-                                           yRange[0] + (yRange[1] - yRange[0]) * ((Convert.ToSingle(CSV.rowData[i][2]) - yDomain[0]) / (yDomain[1] - yDomain[0])), 0.0f);
-            if (CSV.dataSets.Count > 2) //if (CSV.rowData[i][0] == CSV.dataSets[2])
+            mountainInfo = new string[CSV.NumberOfData() + localMountains.Count];
+            dataPoints = new GameObject[CSV.NumberOfData() + localMountains.Count];
+            localOffset = CSV.NumberOfData() - 1;
+            for (int i = 1; i <= CSV.NumberOfData(); i++)
             {
-                var newPoint = Instantiate(DataPoint0, position, Quaternion.identity);
+                Vector3 position = new Vector3(xRange[0] + (xRange[1] - xRange[0]) * ((Convert.ToSingle(CSV.rowData[i][1]) - xDomain[0]) / (xDomain[1] - xDomain[0])),
+                                               yRange[0] + (yRange[1] - yRange[0]) * ((Convert.ToSingle(CSV.rowData[i][2]) - yDomain[0]) / (yDomain[1] - yDomain[0])), 0.0f);
+                var newPoint = Instantiate(DataPoint2, position, Quaternion.identity);
                 newPoint.transform.parent = transform;
                 newPoint.transform.localPosition = position;
                 dataPoints[i - 1] = newPoint;
                 mountainInfo[i - 1] = CSV.rowData[i][0] + " (Elevation " + CSV.rowData[i][3] + "):\n(" + CSV.rowData[i][2] + "," + CSV.rowData[i][1] + ")";
             }
-            else if (CSV.rowData[i][0] == CSV.dataSets[0])
-            {
+        }
 
-                var newPoint = Instantiate(DataPoint0, position, Quaternion.identity);
-                newPoint.transform.parent = transform;
-                newPoint.transform.localPosition = position;
-            }
-            else if (CSV.rowData[i][0] == CSV.dataSets[1])
+        // Online Mode
+        else
+        {
+            mountainInfo = new string[remoteMountains.Count + localMountains.Count];
+            dataPoints = new GameObject[remoteMountains.Count + localMountains.Count];
+            for (int i = 0; i < remoteMountains.Count; i++)
             {
+                localOffset = remoteMountains.Count;
+                Vector3 position = new Vector3(xRange[0] + (xRange[1] - xRange[0]) * ((Convert.ToSingle(remoteMountains[i].longitude) - xDomain[0]) / (xDomain[1] - xDomain[0])),
+                                   yRange[0] + (yRange[1] - yRange[0]) * ((Convert.ToSingle(remoteMountains[i].latitude) - yDomain[0]) / (yDomain[1] - yDomain[0])), 0.0f);
                 var newPoint = Instantiate(DataPoint1, position, Quaternion.identity);
                 newPoint.transform.parent = transform;
                 newPoint.transform.localPosition = position;
+                dataPoints[i] = newPoint;
+                mountainInfo[i] = remoteMountains[i].peak + " (Elevation " + remoteMountains[i].elevation + "):\n(" + remoteMountains[i].latitude + "," + remoteMountains[i].longitude + ")";
+                Debug.Log(remoteMountains[i].peak + " (Elevation " + remoteMountains[i].elevation + "):\n(" + remoteMountains[i].latitude + "," + remoteMountains[i].longitude + ")");
             }
+        }
+
+        // Local Data
+        for (int i = 0; i < localMountains.Count; i++)
+        {
+            Vector3 position = new Vector3(xRange[0] + (xRange[1] - xRange[0]) * ((Convert.ToSingle(localMountains[i].longitude) - xDomain[0]) / (xDomain[1] - xDomain[0])),
+                   yRange[0] + (yRange[1] - yRange[0]) * ((Convert.ToSingle(localMountains[i].latitude) - yDomain[0]) / (yDomain[1] - yDomain[0])), 0.0f);
+            
+            var newPoint = Instantiate(DataPoint0, position, Quaternion.identity);
+            newPoint.transform.parent = transform;
+            newPoint.transform.localPosition = position;
+            dataPoints[i + localOffset] = newPoint;
+            mountainInfo[i + localOffset] = localMountains[i].title + " (Elevation " + localMountains[i].altitude + "):\n(" + localMountains[i].latitude + "," + localMountains[i].longitude + ")";
         }
     }
     int getDataPointIndex(GameObject point)
     {
         for (var i = 0; i < dataPoints.Length; i++)
         {
+            Debug.Log(i + " " + dataPoints[i]);
             if (dataPoints[i].Equals(point))
             {
                 return i;
